@@ -4,22 +4,27 @@ let audioLevel = 0;
 let isAudioActive = false;
 let audioThreshold = 0.02;
 let lastAudioTime = 0;
-let audioTimeout = 1000;
+let audioTimeout = 800;
 
 // Parámetros del Triángulo de Sierpinski
 let sierpinskiLevels = 5;
-let maxLevels = 12;
+let maxLevels = 15;
 let baseTriangleSize = 500;
 let currentDepth = 0;
 let targetDepth = 0;
 
-// Sistema de cámara
+// Sistema de cámara - ZOOM MÁS RÁPIDO
 let cameraZoom = 1;
 let targetZoom = 1;
-let zoomSpeed = 0.05;
+let zoomSpeed = 0.3; // Aumentado significativamente
 let cameraOffset = { x: 0, y: 0 };
 let targetOffset = { x: 0, y: 0 };
-let panSpeed = 0.1;
+let panSpeed = 0.2; // Aumentado para seguir el zoom rápido
+
+// Control de generación - MÁS LENTO
+let lastDepthIncrease = 0;
+let depthIncreaseInterval = 1500; // Aumentado a 1.5 segundos entre niveles
+let isIncreasingDepth = false;
 
 // Colores
 let colorHue = 0;
@@ -63,10 +68,13 @@ function draw() {
   // Actualizar estado de navegación basado en audio
   updateNavigationState();
   
+  // Controlar aumento de profundidad (MÁS LENTO)
+  controlDepthIncrease();
+  
   // Actualizar parámetros según el audio
   updateParametersFromAudio();
   
-  // Actualizar sistema de cámara
+  // Actualizar sistema de cámara (ZOOM RÁPIDO)
   updateCamera();
   
   // Aplicar transformaciones de cámara
@@ -104,27 +112,29 @@ function updateNavigationState() {
   let timeSinceLastAudio = currentTime - lastAudioTime;
   
   if (isAudioActive) {
-    // Con audio, nos adentramos en el triángulo superior
-    targetDepth = min(maxLevels, currentDepth + 1);
+    // Con audio, nos preparamos para aumentar profundidad (pero lo controlamos separadamente)
+    isIncreasingDepth = true;
     
     // Calcular el punto central del triángulo superior para navegar hacia él
     let triangleHeight = baseTriangleSize * sqrt(3) / 2;
     targetOffset = { x: 0, y: -triangleHeight / 3 };
     
-    // Zoom para acercarse (adentrarse)
-    targetZoom = min(5.0, cameraZoom + 0.1);
+    // ZOOM MUCHO MÁS RÁPIDO - Aumentado exponencialmente
+    let zoomIntensity = map(audioLevel, audioThreshold, 0.3, 0.8, 2.5, true);
+    targetZoom = min(20.0, cameraZoom + zoomIntensity); // Límite aumentado a 20x
     
     isColorMode = true;
-    colorHue = (colorHue + 2) % 360;
+    colorHue = (colorHue + 5) % 360; // Rotación de color más rápida
   } else if (timeSinceLastAudio > audioTimeout) {
-    // Sin audio, retrocedemos lentamente
-    targetDepth = max(0, currentDepth - 0.01);
+    // Sin audio, retrocedemos
+    isIncreasingDepth = false;
+    targetDepth = max(0, currentDepth - 0.005); // Retroceso muy lento
     
     // Volver al centro
     targetOffset = { x: 0, y: 0 };
     
-    // Zoom para alejarse
-    targetZoom = max(1.0, cameraZoom - 0.01);
+    // Zoom para alejarse - más rápido también
+    targetZoom = max(1.0, cameraZoom - 0.3);
     
     if (!isAudioActive) {
       isColorMode = false;
@@ -132,31 +142,49 @@ function updateNavigationState() {
   }
 }
 
+function controlDepthIncrease() {
+  let currentTime = millis();
+  
+  // SOLO aumentar profundidad si ha pasado el intervalo y hay audio activo
+  if (isIncreasingDepth && currentTime - lastDepthIncrease > depthIncreaseInterval) {
+    if (targetDepth < maxLevels) {
+      targetDepth += 1; // Aumentar un nivel completo
+      lastDepthIncrease = currentTime;
+      console.log(`Aumentando profundidad a: ${targetDepth}`);
+    }
+  }
+}
+
 function updateParametersFromAudio() {
   if (isAudioActive) {
-    let speedFactor = map(audioLevel, audioThreshold, 0.3, 1, 3, true);
-    zoomSpeed = 0.08 * speedFactor;
-    panSpeed = 0.15 * speedFactor;
+    let speedFactor = map(audioLevel, audioThreshold, 0.3, 1, 4, true);
+    zoomSpeed = 0.4 * speedFactor; // Velocidad de zoom muy alta
+    panSpeed = 0.3 * speedFactor; // Velocidad de pan alta
   } else {
-    zoomSpeed = 0.03;
-    panSpeed = 0.05;
+    zoomSpeed = 0.2; // Retroceso rápido también
+    panSpeed = 0.1;
   }
 }
 
 function updateCamera() {
-  // Suavizar transiciones de zoom y posición
+  // Suavizar transiciones de zoom y posición - pero más rápido
   cameraZoom = lerp(cameraZoom, targetZoom, zoomSpeed);
   cameraOffset.x = lerp(cameraOffset.x, targetOffset.x, panSpeed);
   cameraOffset.y = lerp(cameraOffset.y, targetOffset.y, panSpeed);
   
-  // Actualizar profundidad actual
-  currentDepth = lerp(currentDepth, targetDepth, panSpeed);
+  // Actualizar profundidad actual - transición suave pero visible
+  currentDepth = lerp(currentDepth, targetDepth, 0.05); // Más lento para notar la transición
 }
 
 function applyCameraTransform() {
   translate(width / 2, height / 2);
   scale(cameraZoom);
   translate(cameraOffset.x, cameraOffset.y);
+  
+  // Pequeña rotación sutil cuando el zoom es alto
+  if (cameraZoom > 3) {
+    rotate(sin(millis() * 0.001) * 0.1);
+  }
 }
 
 function drawSierpinski() {
@@ -208,7 +236,7 @@ function isTriangleOffscreen(x1, y1, x2, y2, x3, y3) {
   // Verificar si todos los puntos están fuera de la pantalla
   let allOffscreen = true;
   for (let point of screenPoints) {
-    if (point.x >= 0 && point.x <= width && point.y >= 0 && point.y <= height) {
+    if (point.x >= -100 && point.x <= width + 100 && point.y >= -100 && point.y <= height + 100) {
       allOffscreen = false;
       break;
     }
@@ -229,16 +257,16 @@ function drawTriangle(x1, y1, x2, y2, x3, y3, depth) {
   let hue, saturation, brightness;
   
   if (isColorMode) {
-    hue = (colorHue + depth * 30) % 360;
-    saturation = map(audioLevel, audioThreshold, 0.3, 60, 100, true);
-    brightness = map(depth, 0, maxLevels, 70, 100);
+    hue = (colorHue + depth * 40) % 360;
+    saturation = map(audioLevel, audioThreshold, 0.3, 70, 100, true);
+    brightness = map(depth, 0, maxLevels, 60, 95);
   } else {
     hue = 200;
     saturation = 0;
-    brightness = map(depth, 0, maxLevels, 50, 90);
+    brightness = map(depth, 0, maxLevels, 40, 85);
   }
   
-  let alpha = map(depth, 0, maxLevels, 100, 40);
+  let alpha = map(depth, 0, maxLevels, 100, 30);
   
   // Dibujar triángulo relleno
   fill(hue, saturation, brightness, alpha);
@@ -250,10 +278,10 @@ function drawTriangle(x1, y1, x2, y2, x3, y3, depth) {
   vertex(x3, y3);
   endShape(CLOSE);
   
-  // Dibujar bordes en niveles más bajos
-  if (depth <= 3) {
-    stroke(0, 0, 100, 30);
-    strokeWeight(1);
+  // Dibujar bordes en niveles más bajos o cuando el zoom es alto
+  if (depth <= 4 || cameraZoom > 8) {
+    stroke(0, 0, 100, 20);
+    strokeWeight(0.5);
     noFill();
     
     beginShape();
@@ -270,18 +298,28 @@ function drawInfo() {
   textSize(14);
   
   text(`Profundidad: ${floor(currentDepth)}/${maxLevels}`, 20, 30);
-  text(`Zoom: ${cameraZoom.toFixed(2)}x`, 20, 50);
+  text(`Zoom: ${cameraZoom.toFixed(1)}x`, 20, 50);
   text(`Nivel de audio: ${(audioLevel * 100).toFixed(1)}%`, 20, 70);
   text(`Umbral: ${(audioThreshold * 100).toFixed(1)}%`, 20, 90);
   
-  let state = isAudioActive ? "ADENTRÁNDOSE" : "RETROCEDIENDO";
+  let state = isAudioActive ? 
+             (isIncreasingDepth ? "ADENTRÁNDOSE ⚡" : "ESPERANDO SIG. NIVEL") : 
+             "RETROCEDIENDO";
   text(`Estado: ${state}`, 20, 110);
   
-  text(`Modo: ${isColorMode ? "COLOR" : "GRIS"}`, 20, 130);
+  text(`Modo: ${isColorMode ? "COLOR 🌈" : "GRIS"}`, 20, 130);
+  
+  // Mostrar tiempo hasta siguiente nivel
+  if (isAudioActive && isIncreasingDepth && targetDepth < maxLevels) {
+    let timeLeft = depthIncreaseInterval - (millis() - lastDepthIncrease);
+    let secondsLeft = ceil(timeLeft / 1000);
+    text(`Siguiente nivel en: ${secondsLeft}s`, 20, 150);
+  }
   
   // Instrucciones
   textSize(12);
-  text("Haz sonido para ADENTRARTE en el fractal", 20, height - 50);
+  text("⚡ HAZ SONIDO PARA ACERCARTE RÁPIDAMENTE", 20, height - 70);
+  text("🐌 LA GENERACIÓN DE TRIÁNGULOS ES LENTA", 20, height - 50);
   text("Silencio = RETROCEDER automáticamente", 20, height - 30);
   text("Haz clic en el canvas para reiniciar", 20, height - 10);
 }
@@ -296,5 +334,7 @@ function mousePressed() {
     cameraOffset = { x: 0, y: 0 };
     targetOffset = { x: 0, y: 0 };
     colorHue = 0;
+    lastDepthIncrease = millis();
+    console.log("Reiniciado");
   }
 }
