@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Curva del Dragón Audio-Reactiva</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/addons/p5.sound.min.js"></script>
+    <script src="sketch.js"></script>
+  </head>
+  <body>
+    <h1>Curva del Dragón Audio-Reactiva</h1>
+    <div id="canvas-container"></div>
+    <button id="startButton">Iniciar Audio</button>
+    <div class="info">
+      <h2>Instrucciones:</h2>
+      <p>
+        1. Haz clic en "Iniciar Audio" para permitir el acceso al micrófono.
+      </p>
+      <p>2. La curva del dragón se generará lentamente de forma automática.</p>
+      <p>
+        3. Al hacer sonido (superar el umbral), la generación se acelerará y
+        cambiará a colores.
+      </p>
+      <p>
+        4. El gráfico a la derecha muestra el nivel de audio y el umbral (línea
+        horizontal).
+      </p>
+    </div>
+  </body>
+</html>
