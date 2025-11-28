@@ -3,32 +3,34 @@ let amplitude;
 let audioLevel = 0;
 let isAudioActive = false;
 let audioThreshold = 0.02;
-let lastAudioTime = 0;
-let audioTimeout = 800;
 
 // Parámetros del Triángulo de Sierpinski
-let sierpinskiLevels = 5;
-let maxLevels = 15;
+let maxLevels = 20;
 let baseTriangleSize = 500;
 let currentDepth = 0;
 let targetDepth = 0;
 
-// Sistema de cámara - ZOOM MÁS RÁPIDO
+// Sistema de cámara - ZOOM MÁS LENTO Y CONTINUO
 let cameraZoom = 1;
 let targetZoom = 1;
-let zoomSpeed = 0.3; // Aumentado significativamente
+let zoomSpeed = 0.02; // Reducido significativamente
 let cameraOffset = { x: 0, y: 0 };
 let targetOffset = { x: 0, y: 0 };
-let panSpeed = 0.2; // Aumentado para seguir el zoom rápido
+let panSpeed = 0.05;
 
-// Control de generación - MÁS LENTO
+// Control de generación progresiva
 let lastDepthIncrease = 0;
-let depthIncreaseInterval = 1500; // Aumentado a 1.5 segundos entre niveles
-let isIncreasingDepth = false;
+let depthIncreaseInterval = 800; // Intervalo entre niveles
+let zoomThresholdForNextLevel = 1.5; // Zoom necesario para generar siguiente nivel
+let nextLevelZoomThreshold = 1.5;
 
 // Colores
 let colorHue = 0;
 let isColorMode = false;
+
+// Historial de zoom para suavizar transiciones
+let zoomHistory = [];
+const zoomHistorySize = 10;
 
 function setup() {
   createCanvas(1000, 600);
@@ -57,6 +59,11 @@ function setup() {
       });
     });
   }
+  
+  // Inicializar historial de zoom
+  for (let i = 0; i < zoomHistorySize; i++) {
+    zoomHistory.push(1);
+  }
 }
 
 function draw() {
@@ -68,13 +75,13 @@ function draw() {
   // Actualizar estado de navegación basado en audio
   updateNavigationState();
   
-  // Controlar aumento de profundidad (MÁS LENTO)
-  controlDepthIncrease();
+  // Controlar aumento de profundidad basado en zoom
+  controlDepthByZoom();
   
   // Actualizar parámetros según el audio
   updateParametersFromAudio();
   
-  // Actualizar sistema de cámara (ZOOM RÁPIDO)
+  // Actualizar sistema de cámara
   updateCamera();
   
   // Aplicar transformaciones de cámara
@@ -95,10 +102,6 @@ function updateAudioAnalysis() {
     try {
       audioLevel = amplitude.getLevel();
       isAudioActive = audioLevel > audioThreshold;
-      
-      if (isAudioActive) {
-        lastAudioTime = millis();
-      }
     } catch (e) {
       console.log("Error en análisis de audio:", e);
       audioLevel = 0;
@@ -108,72 +111,64 @@ function updateAudioAnalysis() {
 }
 
 function updateNavigationState() {
-  let currentTime = millis();
-  let timeSinceLastAudio = currentTime - lastAudioTime;
-  
   if (isAudioActive) {
-    // Con audio, nos preparamos para aumentar profundidad (pero lo controlamos separadamente)
-    isIncreasingDepth = true;
+    // Con audio, aumentamos el zoom continuamente
+    let zoomIntensity = map(audioLevel, audioThreshold, 0.3, 0.005, 0.03, true);
+    targetZoom += zoomIntensity; // Sin límite superior
     
     // Calcular el punto central del triángulo superior para navegar hacia él
     let triangleHeight = baseTriangleSize * sqrt(3) / 2;
     targetOffset = { x: 0, y: -triangleHeight / 3 };
     
-    // ZOOM MUCHO MÁS RÁPIDO - Aumentado exponencialmente
-    let zoomIntensity = map(audioLevel, audioThreshold, 0.3, 0.8, 2.5, true);
-    targetZoom = min(20.0, cameraZoom + zoomIntensity); // Límite aumentado a 20x
-    
     isColorMode = true;
-    colorHue = (colorHue + 5) % 360; // Rotación de color más rápida
-  } else if (timeSinceLastAudio > audioTimeout) {
-    // Sin audio, retrocedemos
-    isIncreasingDepth = false;
-    targetDepth = max(0, currentDepth - 0.005); // Retroceso muy lento
-    
-    // Volver al centro
-    targetOffset = { x: 0, y: 0 };
-    
-    // Zoom para alejarse - más rápido también
-    targetZoom = max(1.0, cameraZoom - 0.3);
-    
-    if (!isAudioActive) {
-      isColorMode = false;
-    }
+    colorHue = (colorHue + 2) % 360;
+  } else {
+    // Sin audio, mantenemos el zoom actual (no retrocedemos)
+    // targetZoom se mantiene igual
+    isColorMode = false;
   }
 }
 
-function controlDepthIncrease() {
+function controlDepthByZoom() {
   let currentTime = millis();
   
-  // SOLO aumentar profundidad si ha pasado el intervalo y hay audio activo
-  if (isIncreasingDepth && currentTime - lastDepthIncrease > depthIncreaseInterval) {
-    if (targetDepth < maxLevels) {
-      targetDepth += 1; // Aumentar un nivel completo
+  // Calcular zoom promedio suavizado
+  zoomHistory.push(cameraZoom);
+  if (zoomHistory.length > zoomHistorySize) {
+    zoomHistory.shift();
+  }
+  let smoothedZoom = zoomHistory.reduce((a, b) => a + b, 0) / zoomHistory.length;
+  
+  // Aumentar profundidad cuando alcanzamos el umbral de zoom
+  if (smoothedZoom >= nextLevelZoomThreshold && currentDepth < maxLevels) {
+    if (currentTime - lastDepthIncrease > depthIncreaseInterval) {
+      targetDepth += 1;
+      nextLevelZoomThreshold = smoothedZoom * 1.8; // Aumentar umbral para siguiente nivel
       lastDepthIncrease = currentTime;
-      console.log(`Aumentando profundidad a: ${targetDepth}`);
+      console.log(`Aumentando profundidad a: ${targetDepth}, próximo umbral: ${nextLevelZoomThreshold.toFixed(2)}`);
     }
   }
 }
 
 function updateParametersFromAudio() {
   if (isAudioActive) {
-    let speedFactor = map(audioLevel, audioThreshold, 0.3, 1, 4, true);
-    zoomSpeed = 0.4 * speedFactor; // Velocidad de zoom muy alta
-    panSpeed = 0.3 * speedFactor; // Velocidad de pan alta
+    let speedFactor = map(audioLevel, audioThreshold, 0.3, 1, 2, true);
+    zoomSpeed = 0.03 * speedFactor; // Velocidad de zoom reducida
+    panSpeed = 0.08 * speedFactor;
   } else {
-    zoomSpeed = 0.2; // Retroceso rápido también
-    panSpeed = 0.1;
+    zoomSpeed = 0.01; // Muy lento cuando no hay audio
+    panSpeed = 0.02;
   }
 }
 
 function updateCamera() {
-  // Suavizar transiciones de zoom y posición - pero más rápido
+  // Suavizar transiciones de zoom y posición
   cameraZoom = lerp(cameraZoom, targetZoom, zoomSpeed);
   cameraOffset.x = lerp(cameraOffset.x, targetOffset.x, panSpeed);
   cameraOffset.y = lerp(cameraOffset.y, targetOffset.y, panSpeed);
   
-  // Actualizar profundidad actual - transición suave pero visible
-  currentDepth = lerp(currentDepth, targetDepth, 0.05); // Más lento para notar la transición
+  // Actualizar profundidad actual - transición suave
+  currentDepth = lerp(currentDepth, targetDepth, 0.03);
 }
 
 function applyCameraTransform() {
@@ -181,9 +176,9 @@ function applyCameraTransform() {
   scale(cameraZoom);
   translate(cameraOffset.x, cameraOffset.y);
   
-  // Pequeña rotación sutil cuando el zoom es alto
+  // Rotación sutil cuando el zoom es alto
   if (cameraZoom > 3) {
-    rotate(sin(millis() * 0.001) * 0.1);
+    rotate(sin(millis() * 0.0005) * 0.05);
   }
 }
 
@@ -236,7 +231,7 @@ function isTriangleOffscreen(x1, y1, x2, y2, x3, y3) {
   // Verificar si todos los puntos están fuera de la pantalla
   let allOffscreen = true;
   for (let point of screenPoints) {
-    if (point.x >= -100 && point.x <= width + 100 && point.y >= -100 && point.y <= height + 100) {
+    if (point.x >= -200 && point.x <= width + 200 && point.y >= -200 && point.y <= height + 200) {
       allOffscreen = false;
       break;
     }
@@ -257,16 +252,16 @@ function drawTriangle(x1, y1, x2, y2, x3, y3, depth) {
   let hue, saturation, brightness;
   
   if (isColorMode) {
-    hue = (colorHue + depth * 40) % 360;
+    hue = (colorHue + depth * 30) % 360;
     saturation = map(audioLevel, audioThreshold, 0.3, 70, 100, true);
-    brightness = map(depth, 0, maxLevels, 60, 95);
+    brightness = map(depth, 0, maxLevels, 70, 95);
   } else {
     hue = 200;
     saturation = 0;
-    brightness = map(depth, 0, maxLevels, 40, 85);
+    brightness = map(depth, 0, maxLevels, 50, 85);
   }
   
-  let alpha = map(depth, 0, maxLevels, 100, 30);
+  let alpha = map(depth, 0, maxLevels, 100, 40);
   
   // Dibujar triángulo relleno
   fill(hue, saturation, brightness, alpha);
@@ -279,8 +274,8 @@ function drawTriangle(x1, y1, x2, y2, x3, y3, depth) {
   endShape(CLOSE);
   
   // Dibujar bordes en niveles más bajos o cuando el zoom es alto
-  if (depth <= 4 || cameraZoom > 8) {
-    stroke(0, 0, 100, 20);
+  if (depth <= 4 || cameraZoom > 5) {
+    stroke(0, 0, 100, 30);
     strokeWeight(0.5);
     noFill();
     
@@ -298,29 +293,25 @@ function drawInfo() {
   textSize(14);
   
   text(`Profundidad: ${floor(currentDepth)}/${maxLevels}`, 20, 30);
-  text(`Zoom: ${cameraZoom.toFixed(1)}x`, 20, 50);
+  text(`Zoom: ${cameraZoom.toFixed(2)}x`, 20, 50);
   text(`Nivel de audio: ${(audioLevel * 100).toFixed(1)}%`, 20, 70);
   text(`Umbral: ${(audioThreshold * 100).toFixed(1)}%`, 20, 90);
   
-  let state = isAudioActive ? 
-             (isIncreasingDepth ? "ADENTRÁNDOSE ⚡" : "ESPERANDO SIG. NIVEL") : 
-             "RETROCEDIENDO";
+  let state = isAudioActive ? "AVANZANDO 🎵" : "PAUSADO 🔇";
   text(`Estado: ${state}`, 20, 110);
   
   text(`Modo: ${isColorMode ? "COLOR 🌈" : "GRIS"}`, 20, 130);
   
-  // Mostrar tiempo hasta siguiente nivel
-  if (isAudioActive && isIncreasingDepth && targetDepth < maxLevels) {
-    let timeLeft = depthIncreaseInterval - (millis() - lastDepthIncrease);
-    let secondsLeft = ceil(timeLeft / 1000);
-    text(`Siguiente nivel en: ${secondsLeft}s`, 20, 150);
+  // Mostrar próximo umbral de zoom
+  if (currentDepth < maxLevels) {
+    text(`Siguiente nivel en zoom: ${nextLevelZoomThreshold.toFixed(2)}x`, 20, 150);
   }
   
   // Instrucciones
   textSize(12);
-  text("⚡ HAZ SONIDO PARA ACERCARTE RÁPIDAMENTE", 20, height - 70);
-  text("🐌 LA GENERACIÓN DE TRIÁNGULOS ES LENTA", 20, height - 50);
-  text("Silencio = RETROCEDER automáticamente", 20, height - 30);
+  text("🎵 HAZ SONIDO PARA AVANZAR CONTINUAMENTE", 20, height - 70);
+  text("🌌 EL ZOOM ES LENTO Y PROGRESIVO", 20, height - 50);
+  text("🔇 SILENCIO = PAUSA (NO RETROCEDE)", 20, height - 30);
   text("Haz clic en el canvas para reiniciar", 20, height - 10);
 }
 
@@ -334,7 +325,15 @@ function mousePressed() {
     cameraOffset = { x: 0, y: 0 };
     targetOffset = { x: 0, y: 0 };
     colorHue = 0;
+    nextLevelZoomThreshold = 1.5;
     lastDepthIncrease = millis();
+    
+    // Reiniciar historial de zoom
+    zoomHistory = [];
+    for (let i = 0; i < zoomHistorySize; i++) {
+      zoomHistory.push(1);
+    }
+    
     console.log("Reiniciado");
   }
 }
