@@ -3,30 +3,148 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Curva del Dragón Audio-Reactiva</title>
-    <link rel="stylesheet" href="style.css" />
+    <title>Árbol Fractal Audio-Reactivo</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/addons/p5.sound.min.js"></script>
-    <script src="sketch.js"></script>
+    <link rel="stylesheet" href="style.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
   </head>
   <body>
-    <h1>Curva del Dragón Audio-Reactiva</h1>
-    <div id="canvas-container"></div>
-    <button id="startButton">Iniciar Audio</button>
-    <div class="info">
-      <h2>Instrucciones:</h2>
-      <p>
-        1. Haz clic en "Iniciar Audio" para permitir el acceso al micrófono.
-      </p>
-      <p>2. La curva del dragón se generará lentamente de forma automática.</p>
-      <p>
-        3. Al hacer sonido (superar el umbral), la generación se acelerará y
-        cambiará a colores.
-      </p>
-      <p>
-        4. El gráfico a la derecha muestra el nivel de audio y el umbral (línea
-        horizontal).
-      </p>
+    <div class="container">
+      <header>
+        <h1><i class="fas fa-tree"></i> Árbol Fractal Audio-Reactivo</h1>
+        <p class="subtitle">
+          Un árbol fractal que responde al sonido del micrófono
+        </p>
+      </header>
+
+      <main>
+        <div id="canvas-container"></div>
+
+        <div class="controls">
+          <div class="control-group">
+            <h3><i class="fas fa-sliders-h"></i> Controles</h3>
+            <button id="start-btn" class="btn">
+              <i class="fas fa-microphone"></i> Activar Micrófono
+            </button>
+            <button id="reset-btn" class="btn">
+              <i class="fas fa-redo"></i> Reiniciar
+            </button>
+            <button id="info-btn" class="btn">
+              <i class="fas fa-info-circle"></i> Información
+            </button>
+          </div>
+
+          <div class="control-group">
+            <h3><i class="fas fa-chart-bar"></i> Parámetros del Sonido</h3>
+            <div class="meter-container">
+              <div class="meter-label">Nivel de Audio</div>
+              <div class="meter">
+                <div id="audio-level" class="meter-fill"></div>
+              </div>
+              <div id="audio-value" class="meter-value">0.00</div>
+            </div>
+
+            <div class="param-display">
+              <div class="param">
+                <span>Frecuencia baja:</span>
+                <span id="low-freq">0</span>
+              </div>
+              <div class="param">
+                <span>Frecuencia media:</span>
+                <span id="mid-freq">0</span>
+              </div>
+              <div class="param">
+                <span>Frecuencia alta:</span>
+                <span id="high-freq">0</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <h3><i class="fas fa-palette"></i> Parámetros del Fractal</h3>
+            <div class="param-display">
+              <div class="param">
+                <span>Nivel de recursión:</span>
+                <span id="recursion-level">0</span>
+              </div>
+              <div class="param">
+                <span>Ángulo de ramas:</span>
+                <span id="branch-angle">0°</span>
+              </div>
+              <div class="param">
+                <span>Longitud de ramas:</span>
+                <span id="branch-length">0</span>
+              </div>
+              <div class="param">
+                <span>Hue de color:</span>
+                <span id="color-hue">0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <footer>
+        <p>Proyecto de Arte Generativo Audio-Reactivo | Creado con p5.js</p>
+        <p>
+          Haz sonido (habla, canta, reproduce música) para ver cómo el fractal
+          reacciona
+        </p>
+      </footer>
     </div>
+
+    <!-- Modal de información -->
+    <div id="info-modal" class="modal">
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2><i class="fas fa-info-circle"></i> Cómo Funciona</h2>
+        <div class="info-section">
+          <h3><i class="fas fa-tree"></i> El Fractal</h3>
+          <p>
+            Este proyecto genera un árbol fractal recursivo que se dibuja desde
+            la base hacia arriba, dividiéndose en múltiples ramas en cada nivel.
+          </p>
+        </div>
+        <div class="info-section">
+          <h3><i class="fas fa-volume-up"></i> Reactividad al Audio</h3>
+          <p>
+            El micrófono captura sonido en tiempo real y analiza su amplitud y
+            frecuencias:
+          </p>
+          <ul>
+            <li>
+              <strong>Amplitud</strong> → Controla el nivel de recursión
+              (profundidad del árbol)
+            </li>
+            <li>
+              <strong>Frecuencias bajas</strong> → Controlan el ángulo de las
+              ramas
+            </li>
+            <li>
+              <strong>Frecuencias medias</strong> → Controlan la longitud de las
+              ramas
+            </li>
+            <li>
+              <strong>Frecuencias altas</strong> → Controlan el color (hue)
+            </li>
+          </ul>
+        </div>
+        <div class="info-section">
+          <h3><i class="fas fa-code"></i> Tecnologías Utilizadas</h3>
+          <p>• p5.js para gráficos y animación</p>
+          <p>• p5.sound.js para análisis de audio</p>
+          <p>• Algoritmo recursivo para generar el fractal</p>
+          <p>
+            • FFT (Transformada Rápida de Fourier) para análisis de frecuencias
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <script src="sketch.js"></script>
   </body>
 </html>
